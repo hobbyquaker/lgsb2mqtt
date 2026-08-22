@@ -1,0 +1,56 @@
+{
+  "name": "lgsb2mqtt",
+  "version": "1.0.0",
+  "description": "Control LG Soundbars via MQTT",
+  "main": "index.js",
+  "bin": {
+    "lgsb2mqtt": "index.js"
+  },
+  "preferGlobal": true,
+  "files": [
+    "index.js",
+    "config.js",
+    "lib/"
+  ],
+  "scripts": {
+    "start": "node index.js",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write . && eslint --fix .",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "lg",
+    "soundbar",
+    "mqtt",
+    "smarthome",
+    "mqtt-smarthome",
+    "home-automation",
+    "home-assistant"
+  ],
+  "author": "Sebastian 'Hobbyquaker' Raff <hobbyquaker@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hobbyquaker/lgsb2mqtt.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hobbyquaker/lgsb2mqtt/issues"
+  },
+  "homepage": "https://github.com/hobbyquaker/lgsb2mqtt#readme",
+  "dependencies": {
+    "mqtt": "^5.5.0",
+    "yalm": "^4.1.0",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.0.0"
+  }
+}
