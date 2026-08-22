@@ -29,9 +29,18 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - run: npm publish --provenance --access public
+      # idempotent so the workflow can be re-run (workflow_dispatch) for an already published tag
+      - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PKG=$(node -p "require('./package.json').name")
+          VER=$(node -p "require('./package.json').version")
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            echo "$PKG@$VER is already published, skipping"
+          else
+            npm publish --provenance --access public
+          fi
 
   docker:
     runs-on: ubuntu-latest
