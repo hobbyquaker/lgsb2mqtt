@@ -21,4 +21,14 @@ module.exports = [
             'no-unused-vars': ['error', {argsIgnorePattern: '^_'}],
         },
     },
+    {
+        files: ['**/*.mjs'],
+        languageOptions: {
+            ecmaVersion: 2022,
+            sourceType: 'module',
+            globals: {
+                ...globals.node,
+            },
+        },
+    },
 ];
