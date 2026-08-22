@@ -56,6 +56,9 @@ CHANGELOG and README.
   `lgsb2mqtt@<name>` (`/etc/lgsb2mqtt/<name>.env`, system user `lgsb2mqtt`). Mirrors
   lgtv2mqtt's `lib/install.js`; keep the two in sync.
 - `test/` — node:test unit tests (`npm test`), incl. a fake soundbar TCP server.
+- `deploy.sh [user@host]` — `npm pack`, copy to a host and install into
+  `/usr/local/lib/node_modules/lgsb2mqtt`, restart all `lgsb2mqtt@*` units. Same script as
+  in lgtv2mqtt; keep in sync.
 - `scripts/dump.js <address>` — read-only protocol dump of a real device;
   `scripts/live.sh <address> [item value ...]` — run against a real device via a
   throwaway broker; `scripts/e2e.sh` — same without a device.
