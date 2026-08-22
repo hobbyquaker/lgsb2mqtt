@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 — 2026-08-22
+
+- Release workflow creates a GitHub release with the changelog section as notes; can be
+  re-run for an existing tag. No functional changes.
+
 ## 1.0.0 — 2026-08-22
 
 Complete rewrite of the 0.0.1 prototype.
