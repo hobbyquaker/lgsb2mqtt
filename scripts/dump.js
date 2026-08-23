@@ -3,7 +3,7 @@
 // raw responses, then listens for unsolicited messages.
 // Usage: node scripts/dump.js <address> [listen-seconds]
 
-const LgSoundbar = require('../lib/soundbar.js');
+import {LgSoundbar} from '../lib/soundbar.js';
 
 const address = process.argv[2];
 const listenSeconds = Number(process.argv[3] || 20);

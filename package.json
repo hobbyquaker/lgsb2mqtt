@@ -1,7 +1,8 @@
 {
   "name": "lgsb2mqtt",
-  "version": "1.0.1",
-  "description": "Control LG Soundbars via MQTT",
+  "version": "2.0.0",
+  "description": "Interface between LG soundbars and MQTT, with Home Assistant discovery",
+  "type": "module",
   "main": "index.js",
   "bin": {
     "lgsb2mqtt": "index.js"
@@ -12,15 +13,16 @@
     "config.js",
     "lib/"
   ],
+  "engines": {
+    "node": "^20.19 || ^22.12 || >=24"
+  },
   "scripts": {
     "start": "node index.js",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write . && eslint --fix .",
     "test": "node --test",
-    "test:watch": "node --test --watch"
-  },
-  "engines": {
-    "node": ">=20"
+    "test:watch": "node --test --watch",
+    "deploy": "bash deploy.sh"
   },
   "keywords": [
     "lg",
@@ -41,10 +43,16 @@
     "url": "https://github.com/hobbyquaker/lgsb2mqtt/issues"
   },
   "homepage": "https://github.com/hobbyquaker/lgsb2mqtt#readme",
+  "mqttInterfaces": {
+    "spec": "2.0",
+    "envPrefix": "LGSB2MQTT",
+    "needs": [
+      "network-host"
+    ],
+    "serviceExtra": []
+  },
   "dependencies": {
-    "mqtt": "^5.5.0",
-    "yalm": "^4.1.0",
-    "yargs": "^17.7.2"
+    "mqtt-interfaces-core": "^0.6.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

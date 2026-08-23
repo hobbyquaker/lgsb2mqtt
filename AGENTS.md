@@ -8,9 +8,10 @@ formerly the `lg-soundbar` npm module) and to an MQTT broker,
 publishing soundbar state and accepting commands over MQTT.
 
 It follows the [mqtt-smarthome](https://github.com/mqtt-smarthome/mqtt-smarthome)
-architecture, like the author's other adapters (e.g.
-[lgtv2mqtt](https://github.com/hobbyquaker/lgtv2mqtt)). Consistency with that convention
-and with lgtv2mqtt (CLI options, topic/payload style, `--install` layout, logging idioms)
+architecture and, since 2.0, is built on
+[mqtt-interfaces-core](https://github.com/hobbyquaker/mqtt-interfaces-core) (`../mqtt-interfaces-core`
+when checked out next to this repo — generic fixes go there; its README is the complete guide
+to building an adapter). Consistency with the core's conventions and with lgtv2mqtt / cul2mqtt
 is a hard requirement. ROADMAP.md lists what is planned for this adapter.
 
 ## MQTT conventions (mqtt-smarthome)
@@ -35,26 +36,25 @@ QoS: use 0 (avoid QoS 1 — duplicate delivery can re-trigger hardware actions).
 Items are friendly names (`volume`, `mute`, `input`, `eq`, `woofer`, ...) defined in
 `lib/mapping.js` (`ITEMS` table: raw `msg`/`key` ↔ item, type, writable, range, offset).
 Raw protocol topics (`status/<MSG>/<key>`) are opt-in via `--publish-raw`; raw
-`set/<MSG>/<key>` is always accepted. Renaming items is a breaking change — document in
+`set/<MSG>/<key>` is opt-in via `--raw-set`. Renaming items is a breaking change — document in
 CHANGELOG and README.
 
-## Code layout
+## Code layout (ES modules, node >= 20.19)
 
-- `index.js` — MQTT connection, topic handling, wiring to the soundbar client.
+- `index.js` — `createAdapter()` from the core plus the soundbar part: `LgSoundbar` events
+  mirrored into `connected`, `publishData()` (ranges first, then `statusFor()` → `pubStatus()`),
+  `onSet` (friendly via `commandFor()`, raw behind `--raw-set`), discovery re-published when
+  ranges change (the core handles the item triggers).
 - `lib/soundbar.js` — soundbar protocol client (`LgSoundbar` EventEmitter: `connect()`,
   `get(msg)`, `set(msg, data)`, `disconnect()`; events `connect`, `disconnect`, `receive`,
   `socketerror`) plus exported pure helpers (`Framer`, `createPacket`, `encrypt`, `decrypt`).
   Reconnects itself with backoff; `get`/`set` reject with `TimeoutError`/`ResponseError`.
 - `lib/mapping.js` — raw ↔ friendly item table and the pure `statusFor`/`commandFor`
   translation (enum names, booleans, range checks, level offsets).
-- `lib/payload.js` — `parsePayload` (incoming plain/JSON `{val}`) and `StatusTracker`
-  (last values, `{val, ts, lc}` generation for `--json-payloads`).
-- `lib/hadiscovery.js` — `buildDiscovery()`: pure builder of the Home Assistant
-  device-based discovery payload from the last known state + ranges. index.js publishes it
-  after the initial `get`s and again when lists/ranges/device info change.
-- `lib/install.js` — `--install`/`--uninstall` as systemd template service
-  `lgsb2mqtt@<name>` (`/etc/lgsb2mqtt/<name>.env`, system user `lgsb2mqtt`). Mirrors
-  lgtv2mqtt's `lib/install.js`; keep the two in sync.
+- `lib/hadiscovery.js` — `discoveryModel()`: pure device block (id, device, entity map via the
+  core's `entity()`) from the last known state + ranges; the core publishes it after the initial
+  `get`s and again when lists/ranges/device info change.
+- `lib/install.js` — the core installer (`createInstaller`) wired to lgsb2mqtt.
 - `test/` — node:test unit tests (`npm test`), incl. a fake soundbar TCP server.
 - `deploy.sh [user@host]` — `npm pack`, copy to a host and install into
   `/usr/local/lib/node_modules/lgsb2mqtt`, restart all `lgsb2mqtt@*` units. Same script as
@@ -62,15 +62,14 @@ CHANGELOG and README.
 - `scripts/dump.js <address>` — read-only protocol dump of a real device;
   `scripts/live.sh <address> [item value ...]` — run against a real device via a
   throwaway broker; `scripts/e2e.sh` — same without a device.
-- `config.js` — CLI argument parsing via yargs (`--address`, `--mqtt-url` (aliases
-  `-u`, `--url`), `--name`, `--verbosity`, `--json-payloads`, `--ha-discovery`,
-  `--ha-prefix`, `--publish-raw`), every option also via `LGSB2MQTT_*` env vars.
-  Exports the parsed config object (camelCased: `config.mqttUrl`, `config.haDiscovery`).
-- Logging via `yalm` (`log.debug/info/warn/error`), verbosity from `--verbosity`.
+- `config.js` — adapter options (`--address`, `--port`, `--publish-raw`, `--raw-set`) on top of
+  the core's `parseConfig()` (shared MQTT/name/discovery/maintenance options, `LGSB2MQTT_*` env
+  vars, `--config-schema`). Exports `OPTIONS` and the parsed config (camelCased).
+- Logging via the core logger (`adapter.log`), journald-aware; verbosity from `--verbosity`.
 
 ## Style & practices
 
-- Plain Node.js (CommonJS), no build step. 4-space indentation, semicolons.
+- Plain JavaScript, ES modules, no build step. 4-space indentation, semicolons.
 - Keep dependencies minimal; this runs on small always-on machines (Raspberry Pi etc.).
 - Never make default config values point at personal infrastructure (LAN IPs, hostnames).
 - Log received/sent messages at `debug` level with the established `mqtt >`/`mqtt <` /

@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.0
+
+lgsb2mqtt now runs on [mqtt-interfaces-core](https://github.com/hobbyquaker/mqtt-interfaces-core)
+(mqtt-smarthome spec 2.x), like the other adapters of the fleet. Friendly items and topics are
+unchanged; see "Upgrading from 1.x" in the README.
+
+### Breaking
+
+- Status payloads are `{val, ts, lc}` JSON by default (`--no-json-payloads` for plain values).
+- Raw protocol sets (`<name>/set/<MSG>/<key>`) need `--raw-set`.
+- Node ^20.19, ^22.12 or >= 24; the package is an ES module.
+- The systemd template unit is the core's (shared `/etc/mqtt-interfaces/broker.env`, state
+  directory, `Restart=always`): re-run `--install` once per instance.
+
+### Added
+
+- `<name>/info`, `<name>/maintenance/set/loglevel` and `…/restart` (`--no-maintenance` disables).
+- `--config-schema` (JSON Schema of the options, `x-env`/`x-secret`), `--port`,
+  `--mqtt-username`/`--mqtt-password`/`--mqtt-tls-ca`, `MQTT_*` fallback variables, journald-aware
+  logging, `mqttInterfaces` package field — everything she's Services page needs.
+
+### Changed
+
+- `lib/payload.js` and the MQTT/CLI/installer code are replaced by the core; `yalm`, `mqtt` and
+  `yargs` are no longer direct dependencies.
+
 ## 1.0.1 — 2026-08-22
 
 - Release workflow creates a GitHub release with the changelog section as notes; can be

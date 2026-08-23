@@ -1,74 +1,36 @@
-const pkg = require('./package.json');
+import {parseConfig} from 'mqtt-interfaces-core';
+import pkg from './package.json' with {type: 'json'};
 
-module.exports = require('yargs')
-    .usage('Usage: $0 [options]')
-    .env('LGSB2MQTT')
-    .option('address', {
+export const OPTIONS = {
+    address: {
         alias: 'a',
         type: 'string',
         describe: 'soundbar address (ip or hostname)',
-    })
-    .option('mqtt-url', {
-        alias: ['u', 'url'],
-        type: 'string',
-        describe: 'mqtt broker url',
-        default: 'mqtt://localhost',
-    })
-    .option('name', {
-        alias: 'n',
-        type: 'string',
-        describe: 'instance name. used as mqtt client id and as prefix for topics',
-        default: 'soundbar',
-    })
-    .option('json-payloads', {
+        demandOption: true,
+    },
+    port: {
+        type: 'number',
+        describe: 'soundbar control port',
+        default: 9741,
+    },
+    'publish-raw': {
         type: 'boolean',
-        describe: 'publish status as JSON {"val": ..., "ts": ..., "lc": ...} instead of plain values',
+        describe: 'additionally publish every raw protocol field as <name>/status/<MSG>/<key>',
         default: false,
-    })
-    .option('ha-discovery', {
+    },
+    'raw-set': {
         type: 'boolean',
-        describe: 'publish Home Assistant MQTT discovery (use --no-ha-discovery to disable and clear)',
-        default: true,
-    })
-    .option('ha-prefix', {
-        type: 'string',
-        describe: 'Home Assistant discovery prefix',
-        default: 'homeassistant',
-    })
-    .option('publish-raw', {
-        type: 'boolean',
-        describe: 'additionally publish raw protocol messages as status/<MSG>/<key>',
+        describe: 'accept raw protocol sets on <name>/set/<MSG>/<key> (unrestricted device access!)',
         default: false,
-    })
-    .option('verbosity', {
-        alias: 'v',
-        type: 'string',
-        describe: 'log level',
-        choices: ['error', 'warn', 'info', 'debug'],
-        default: 'info',
-    })
-    .option('install', {
-        type: 'boolean',
-        describe:
-            'install as systemd service lgsb2mqtt@<name> using the other options as its config, enable and start it. needs root',
-    })
-    .option('uninstall', {
-        type: 'boolean',
-        describe: 'stop, disable and remove the systemd service lgsb2mqtt@<name>. needs root',
-    })
-    .check((argv) => {
-        if (!argv.address && !argv.uninstall) {
-            throw new Error('Missing required argument: address');
-        }
-        return true;
-    })
-    .example('$0 -a 192.168.1.50 -u mqtt://broker', 'run in the foreground')
-    .example('sudo $0 --install -n soundbar -a 192.168.1.50 -u mqtt://broker', 'install as service lgsb2mqtt@soundbar')
-    .epilog(
-        'Every option can also be set via environment variable, e.g. LGSB2MQTT_ADDRESS, LGSB2MQTT_MQTT_URL.\n' +
-            pkg.homepage,
-    )
-    .version()
-    .help('help')
-    .alias('h', 'help')
-    .strict().argv;
+    },
+};
+
+export default parseConfig({
+    pkg,
+    options: OPTIONS,
+    defaults: {name: 'soundbar'},
+    examples: [
+        ['$0 -a 192.168.1.50 -u mqtt://broker', 'run in the foreground'],
+        ['sudo $0 --install -n soundbar -a 192.168.1.50 -u mqtt://broker', 'install as service lgsb2mqtt@soundbar'],
+    ],
+});

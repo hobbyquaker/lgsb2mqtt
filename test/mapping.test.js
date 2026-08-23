@@ -1,7 +1,7 @@
-const {test, describe} = require('node:test');
-const assert = require('node:assert/strict');
+import {test, describe} from 'node:test';
+import assert from 'node:assert/strict';
 
-const {statusFor, commandFor, rangeBoundFor, ITEMS} = require('../lib/mapping.js');
+import {statusFor, commandFor, rangeBoundFor, ITEMS} from '../lib/mapping.js';
 
 describe('statusFor', () => {
     test('plain values', () => {

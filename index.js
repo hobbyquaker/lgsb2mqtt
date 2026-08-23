@@ -1,76 +1,51 @@
 #!/usr/bin/env node
 
-const log = require('yalm');
-const Mqtt = require('mqtt');
-const config = require('./config.js');
-const pkg = require('./package.json');
-const LgSoundbar = require('./lib/soundbar.js');
-const mapping = require('./lib/mapping.js');
-const {parsePayload, StatusTracker} = require('./lib/payload.js');
-const {buildDiscovery} = require('./lib/hadiscovery.js');
+import {createAdapter} from 'mqtt-interfaces-core';
+import config from './config.js';
+import pkg from './package.json' with {type: 'json'};
+import {LgSoundbar} from './lib/soundbar.js';
+import * as mapping from './lib/mapping.js';
+import {discoveryModel} from './lib/hadiscovery.js';
+import {handle as handleInstall} from './lib/install.js';
 
-if (config.install || config.uninstall) {
-    const {installService, uninstallService} = require('./lib/install.js');
-    const plain = (...args) => console.log(...args);
-    try {
-        if (config.uninstall) {
-            uninstallService(config, plain);
-        } else {
-            installService(config, plain);
-        }
-        process.exit(0);
-    } catch (err) {
-        console.error('error:', err.message);
-        process.exit(1);
-    }
-}
-
-const topicPrefix = config.name;
-const connectedTopic = topicPrefix + '/connected';
-
-let mqttConnected = false;
-let sbConnected = false;
-let shuttingDown = false;
-
-/** last known friendly values, also produces plain or {val, ts, lc} payloads */
-const status = new StatusTracker({json: config.jsonPayloads});
+handleInstall(config);
 
 /** known numeric ranges per friendly item, learned from status messages: {volume: {min, max}, ...} */
 const ranges = {};
+let lgsb = null;
 
-/** items whose change requires a new discovery payload (options/ranges/device info) */
-const DISCOVERY_TRIGGERS = new Set(['input_list', 'eq_list', 'name', 'model', 'firmware', 'uuid']);
-let discoveryTopic = null;
-let discoveryDirty = false;
-
-log.setLevel(config.verbosity);
-
-log.info(pkg.name + ' ' + pkg.version + ' starting');
-log.info('mqtt trying to connect', config.mqttUrl);
-
-const mqtt = Mqtt.connect(config.mqttUrl, {
-    clientId: config.name + '_' + Math.random().toString(16).slice(2, 10),
-    will: {topic: connectedTopic, payload: '0', retain: true},
+const adapter = createAdapter({
+    pkg,
+    config,
+    deviceLabel: 'soundbar',
+    info: {soundbar: `${config.address}:${config.port}`},
+    discovery: ({get}) => discoveryModel({name: config.name, get, ranges, jsonPayloads: config.jsonPayloads}),
+    // items whose change requires a new discovery payload (options / device info); ranges are handled below
+    discoveryTriggers: ['input_list', 'eq_list', 'name', 'model', 'firmware', 'uuid'],
+    onSet: handleSet,
+    onShutdown: () => lgsb && lgsb.disconnect(),
 });
+const {log, pubStatus, setDeviceConnected} = adapter;
 
-const lgsb = new LgSoundbar(config.address, {log});
+/*
+ * soundbar
+ */
+
+lgsb = new LgSoundbar(config.address, {port: config.port, log});
 
 lgsb.on('receive', (data) => {
-    log.debug('lgsb <', data.msg, data.data);
+    log.debug('soundbar <', data.msg, data.data);
     publishData(data);
-    publishDiscoveryIfDirty();
 });
 
 lgsb.on('connect', () => {
-    sbConnected = true;
-    publishConnected();
+    setDeviceConnected(true);
     log.info('soundbar', config.address, 'connected');
     getInitialValues();
 });
 
 lgsb.on('disconnect', () => {
-    sbConnected = false;
-    publishConnected();
+    setDeviceConnected(false);
     log.info('soundbar', config.address, 'disconnected');
 });
 
@@ -78,40 +53,27 @@ lgsb.on('socketerror', (error) => {
     log.warn('soundbar', config.address, error.message || error);
 });
 
-log.info('soundbar trying to connect', config.address);
-lgsb.connect();
-
-function publishConnected() {
-    if (!mqttConnected) {
-        return;
-    }
-    mqttPub(connectedTopic, sbConnected ? '2' : '1', {retain: true});
-}
-
 async function getInitialValues() {
     for (const msg of mapping.INITIAL_MESSAGES) {
         await getData(msg);
     }
-    discoveryDirty = true;
-    publishDiscoveryIfDirty();
+    adapter.markDiscoveryDirty();
+    adapter.publishDiscovery();
 }
 
 async function getData(msg) {
-    log.debug('lgsb > get', msg);
+    log.debug('soundbar > get', msg);
     try {
         publishData(await lgsb.get(msg));
     } catch (error) {
-        log.error('lgsb get', msg, 'failed:', error.message);
+        log.warn('soundbar get', msg, 'failed:', error.message);
     }
 }
 
+/** Send a set and publish the confirmed state; rejections propagate to the core's set handling (warn). */
 async function lgsbSet(msg, data) {
-    log.debug('lgsb > set', msg, data);
-    try {
-        publishData(await lgsb.set(msg, data));
-    } catch (error) {
-        log.error('lgsb set', msg, 'failed:', error.message);
-    }
+    log.debug('soundbar > set', msg, data);
+    publishData(await lgsb.set(msg, data));
 }
 
 function publishData(data) {
@@ -121,11 +83,12 @@ function publishData(data) {
     const entries = Object.entries(data.data);
 
     // learn min/max first: level values in the same message are relative to them
+    let rangesChanged = false;
     for (const [key, value] of entries) {
         const bound = mapping.rangeBoundFor(data.msg, key);
         if (bound && typeof value === 'number') {
             if (!ranges[bound.item] || ranges[bound.item][bound.bound] !== value) {
-                discoveryDirty = true;
+                rangesChanged = true;
             }
             ranges[bound.item] = {...ranges[bound.item], [bound.bound]: value};
         }
@@ -134,152 +97,58 @@ function publishData(data) {
     for (const [key, value] of entries) {
         const friendly = mapping.statusFor(data.msg, key, value, ranges);
         if (friendly) {
-            const {payload, changed} = status.update(friendly.item, friendly.payload);
-            mqttPub(topicPrefix + '/status/' + friendly.item, payload, {retain: friendly.retain});
-            if (changed && DISCOVERY_TRIGGERS.has(friendly.item)) {
-                discoveryDirty = true;
-            }
+            pubStatus(friendly.item, friendly.payload, {retain: friendly.retain});
         }
         if (config.publishRaw) {
             publishRaw(data.msg, key, value);
         }
     }
+
+    if (rangesChanged) {
+        adapter.markDiscoveryDirty();
+        adapter.publishDiscovery();
+    }
 }
 
 function publishRaw(msg, key, value) {
     if (Array.isArray(value)) {
-        value.forEach((val, index) => {
-            mqttPub(topicPrefix + '/status/' + msg + '/' + key + '/' + index, val, {retain: true});
-        });
+        value.forEach((val, index) => pubStatus(`${msg}/${key}/${index}`, val));
     } else {
-        mqttPub(topicPrefix + '/status/' + msg + '/' + key, value, {retain: true});
+        pubStatus(`${msg}/${key}`, value);
     }
 }
 
-function publishDiscoveryIfDirty() {
-    if (!config.haDiscovery || !discoveryDirty || !mqttConnected) {
-        return;
-    }
-    discoveryDirty = false;
-    const {topic, payload} = buildDiscovery({
-        name: config.name,
-        prefix: config.haPrefix,
-        get: (item) => status.get(item),
-        ranges,
-        pkg,
-        jsonPayloads: config.jsonPayloads,
-    });
-    if (discoveryTopic && discoveryTopic !== topic) {
-        // device id changed (uuid became known): remove the old announcement
-        mqttPub(discoveryTopic, '', {retain: true});
-    }
-    discoveryTopic = topic;
-    log.info('mqtt publishing home assistant discovery', topic);
-    mqttPub(topic, payload, {retain: true});
-}
+/*
+ * set handling
+ */
 
-function clearDiscovery() {
-    // remove a possibly earlier announced device (id based on instance name; uuid based ids
-    // are unknown at this point, users can remove those in HA)
-    const {topic} = buildDiscovery({name: config.name, prefix: config.haPrefix, get: () => undefined, pkg});
-    mqttPub(topic, '', {retain: true});
-}
-
-function mqttPub(topic, payload, options) {
-    if (payload !== null && typeof payload === 'object') {
-        payload = JSON.stringify(payload);
-    }
-    log.debug('mqtt >', topic, payload);
-    mqtt.publish(topic, String(payload), options);
-}
-
-mqtt.on('connect', () => {
-    mqttConnected = true;
-    log.info('mqtt connected', config.mqttUrl);
-    publishConnected();
-
-    const setTopic = topicPrefix + '/set/#';
-    log.info('mqtt subscribe', setTopic);
-    mqtt.subscribe(setTopic);
-
-    if (config.haDiscovery) {
-        publishDiscoveryIfDirty();
-    } else {
-        clearDiscovery();
-    }
-});
-
-mqtt.on('close', () => {
-    if (mqttConnected) {
-        mqttConnected = false;
-        log.info('mqtt closed', config.mqttUrl);
-    }
-});
-
-mqtt.on('error', (err) => {
-    log.error('mqtt', err.message || err);
-});
-
-mqtt.on('message', (topic, payload) => {
-    payload = payload.toString();
-    log.debug('mqtt <', topic, payload);
-
-    // <name>/set/<item>  (friendly)  or  <name>/set/<MSG>/<key>  (raw protocol)
-    const [prefix, action, ...parts] = topic.split('/');
-    if (prefix !== topicPrefix || action !== 'set' || parts.length < 1 || parts.length > 2 || parts.includes('')) {
-        log.warn('mqtt ignoring unexpected topic', topic);
-        return;
-    }
-
-    const value = parsePayload(payload);
+async function handleSet(parts, value, topic) {
     if (value === undefined) {
         log.warn('mqtt ignoring empty payload on', topic);
         return;
     }
 
+    // <name>/set/<MSG>/<key>: raw protocol set, opt-in
     if (parts.length === 2 && /^[A-Z0-9_]+$/.test(parts[0])) {
-        // raw protocol set
-        lgsbSet(parts[0], {[parts[1]]: value});
-        return;
+        if (!config.rawSet) {
+            log.warn('mqtt ignoring', topic, '(raw set topics disabled, see --raw-set)');
+            return;
+        }
+        return lgsbSet(parts[0], {[parts[1]]: value});
     }
 
+    // <name>/set/<item>: friendly
     const item = parts.join('/');
     let command;
     try {
         command = mapping.commandFor(item, value, ranges);
     } catch (error) {
-        log.warn('mqtt set', item, String(payload), '-', error.message);
+        log.warn('mqtt set', item, String(value), '-', error.message);
         return;
     }
-    lgsbSet(command.msg, command.data);
-});
-
-function shutdown(signal) {
-    if (shuttingDown) {
-        return;
-    }
-    shuttingDown = true;
-    log.info('received', signal, '- shutting down');
-
-    const exit = () => process.exit(0);
-    const timer = setTimeout(exit, 2000);
-
-    lgsb.disconnect();
-
-    if (mqttConnected) {
-        mqtt.publish(connectedTopic, '0', {retain: true}, () => {
-            mqtt.end(false, {}, () => {
-                clearTimeout(timer);
-                exit();
-            });
-        });
-    } else {
-        mqtt.end(true, {}, () => {
-            clearTimeout(timer);
-            exit();
-        });
-    }
+    return lgsbSet(command.msg, command.data);
 }
 
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+log.info('soundbar trying to connect', config.address);
+lgsb.connect();
+adapter.start();

@@ -1,10 +1,9 @@
-const {test, describe, afterEach} = require('node:test');
-const assert = require('node:assert/strict');
-const net = require('node:net');
-const {setTimeout: sleep} = require('node:timers/promises');
+import {test, describe, afterEach} from 'node:test';
+import assert from 'node:assert/strict';
+import net from 'node:net';
+import {setTimeout as sleep} from 'node:timers/promises';
 
-const LgSoundbar = require('../lib/soundbar.js');
-const {Framer, createPacket, encrypt, decrypt, TimeoutError, ResponseError} = LgSoundbar;
+import LgSoundbar, {Framer, createPacket, encrypt, decrypt, TimeoutError, ResponseError} from '../lib/soundbar.js';
 
 describe('packet encoding', () => {
     test('encrypt/decrypt round trip', () => {

@@ -11,6 +11,12 @@
 - `--json-payloads` (`{val, ts, lc}`), env var configuration, `--install` as
   systemd service, Docker image, CI, unit tests.
 
+## Done in 2.0.0
+
+- Ported to mqtt-interfaces-core 0.6: config, MQTT, discovery publishing, installer, logging and
+  the maintenance topics come from the core; `{val, ts, lc}` payloads by default, `--raw-set`,
+  `--port`, `--config-schema`, `mqttInterfaces` field. Friendly topics unchanged.
+
 ## Open
 
 ### Protocol / device coverage
