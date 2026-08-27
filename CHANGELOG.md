@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 — 2026-08-27
+
+- Release workflow publishes to npm via OIDC trusted publishing (npm >= 11.5.1), no token secret.
+  2.0.0 never reached npm because of this; no functional changes.
+
 ## 2.0.0
 
 lgsb2mqtt now runs on [mqtt-interfaces-core](https://github.com/hobbyquaker/mqtt-interfaces-core)
