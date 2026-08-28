@@ -5,7 +5,7 @@ export const OPTIONS = {
     address: {
         alias: 'a',
         type: 'string',
-        describe: 'soundbar address (ip or hostname)',
+        describe: 'soundbar address (ip or hostname), or "auto" to find it on the network (see --discover)',
         demandOption: true,
     },
     port: {
@@ -29,7 +29,9 @@ export default parseConfig({
     pkg,
     options: OPTIONS,
     defaults: {name: 'soundbar'},
+    discovery: true,
     examples: [
+        ['$0 --discover', 'find soundbars on the network and exit'],
         ['$0 -a 192.168.1.50 -u mqtt://broker', 'run in the foreground'],
         ['sudo $0 --install -n soundbar -a 192.168.1.50 -u mqtt://broker', 'install as service lgsb2mqtt@soundbar'],
     ],

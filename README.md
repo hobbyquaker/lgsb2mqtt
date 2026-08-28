@@ -83,6 +83,57 @@ docker run -d --name lgsb2mqtt \
   ghcr.io/hobbyquaker/lgsb2mqtt
 ```
 
+## Finding the soundbar
+
+```
+lgsb2mqtt --discover
+```
+
+browses the network for Chromecast devices — LG soundbars have Chromecast built in — and keeps
+the ones that also answer on the temescal control port (9741, `--port`), which is what tells a
+soundbar apart from a speaker, a TV or a Nest:
+
+```
+172.16.20.180  Wohnzimmer-Soundbar  LG S90Q Soundbar  [control]  (mdns)
+```
+
+The name and model come from the Chromecast TXT record. `--discover-json` prints the same as
+JSON. `-a auto` runs the scan at start and uses what it found, refusing to start when none or
+more than one soundbar answers rather than bridging the wrong one:
+
+```
+lgsb2mqtt -a auto -u mqtt://broker
+```
+
+### When the soundbar is on another VLAN
+
+mDNS is link-local: a browse does not cross a router on its own. An mDNS reflector (avahi with
+`enable-reflector`) does bridge it — the output above was produced through one — but the
+reflected answers arrive late and not on every attempt: measured over 20 second windows, the
+soundbar showed up in one browse and not in the next. Give the scan `--discover-timeout 20`, and
+when you want it to work every time, name the soundbar or the range it is in instead. The
+control port is probed over TCP, which routes fine:
+
+```
+lgsb2mqtt --discover --discover-address 172.16.20.180      # this device
+lgsb2mqtt --discover --discover-address 172.16.20.0/24     # sweep the range for port 9741
+lgsb2mqtt -a auto --discover-address 172.16.20.0/24 -u mqtt://broker
+```
+
+A soundbar found that way has no Chromecast labels — nothing answered the browse — just its
+address and the open port:
+
+```
+172.16.20.180  [control]  (sweep)
+```
+
+`--discover-timeout` (default 5 s) is how long the scan listens — enough on the local link,
+too short through a reflector.
+
+The scanning itself lives in
+[mqtt-interfaces-core](https://github.com/hobbyquaker/mqtt-interfaces-core); this adapter only
+declares the browse and the port ([lib/discovery.js](lib/discovery.js)).
+
 ## Topics
 
 `<name>` defaults to `soundbar`.

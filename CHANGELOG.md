@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.1.0
+
+### Added
+
+- **Finding the soundbar on the network**: `--discover` browses for Chromecast devices (LG
+  soundbars have Chromecast built in) and keeps the ones that answer on the temescal control port
+  — the name and model come from the Chromecast TXT record. `--discover-json` for JSON,
+  `--discover-timeout` for how long it listens. `-a auto` runs the same scan at start and uses
+  what it found; it refuses to start when none or several answer instead of bridging the wrong
+  soundbar.
+- `--discover-address` for a soundbar on another VLAN: name the device (`172.16.20.180`) or a
+  range to sweep for the control port (`172.16.20.0/24`). An mDNS browse is link-local; an mDNS
+  reflector does bridge it, but its answers arrive late and not on every attempt (verified across
+  two VLANs: found in one 20 second browse, missed in the next), so a named address is the
+  reliable way.
+
+### Changed
+
+- Requires mqtt-interfaces-core ^0.9.0.
+
 ## 2.0.3 — 2026-08-29
 
 - mqtt-interfaces-core 0.8: the instance publishes `<name>/maintenance/stats` (memory, CPU share, event loop lag) every 60 s — `--stats-interval`, 0 = off; she shows it on the Instances tab.

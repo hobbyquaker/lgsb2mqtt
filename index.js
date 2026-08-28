@@ -1,14 +1,35 @@
 #!/usr/bin/env node
 
-import {createAdapter} from 'mqtt-interfaces-core';
+import {createAdapter, createLogger, runDiscovery, autoAddress} from 'mqtt-interfaces-core';
 import config from './config.js';
 import pkg from './package.json' with {type: 'json'};
 import {LgSoundbar} from './lib/soundbar.js';
 import * as mapping from './lib/mapping.js';
 import {discoveryModel} from './lib/hadiscovery.js';
 import {handle as handleInstall} from './lib/install.js';
+import {discoveryHint} from './lib/discovery.js';
 
 handleInstall(config);
+
+/*
+ * finding the soundbar (core B-2): --discover prints every Chromecast that also answers on the
+ * temescal control port, --address auto uses it when exactly one does. Both run before the
+ * adapter exists, so discovery gets its own logger.
+ */
+if (config.discover || config.address === 'auto') {
+    const discoveryLog = createLogger({envPrefix: config.$envPrefix || 'LGSB2MQTT', level: config.verbosity});
+    const hint = discoveryHint({port: config.port});
+    if (config.discover) {
+        await runDiscovery({hint, config, log: discoveryLog}); // prints and exits
+    }
+    try {
+        config.address = await autoAddress(hint, {config, log: discoveryLog});
+    } catch (err) {
+        // none, or several soundbars: bridging the wrong one is worse than not starting
+        discoveryLog.error('--address auto:', err.message);
+        process.exit(1);
+    }
+}
 
 /** known numeric ranges per friendly item, learned from status messages: {volume: {min, max}, ...} */
 const ranges = {};
