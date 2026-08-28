@@ -9,12 +9,12 @@ import {discoveryModel} from './lib/hadiscovery.js';
 import {handle as handleInstall} from './lib/install.js';
 import {discoveryHint} from './lib/discovery.js';
 
-handleInstall(config);
-
 /*
  * finding the soundbar (core B-2): --discover prints every Chromecast that also answers on the
- * temescal control port, --address auto uses it when exactly one does. Both run before the
- * adapter exists, so discovery gets its own logger.
+ * temescal control port, --address auto uses it when exactly one does — its dns name if it has
+ * one. Before the installer on purpose: `--install -a auto` persists what was found rather than
+ * scanning on every service start. The adapter does not exist yet, so discovery gets its own
+ * logger.
  */
 if (config.discover || config.address === 'auto') {
     const discoveryLog = createLogger({envPrefix: config.$envPrefix || 'LGSB2MQTT', level: config.verbosity});
@@ -30,6 +30,8 @@ if (config.discover || config.address === 'auto') {
         process.exit(1);
     }
 }
+
+handleInstall(config);
 
 /** known numeric ranges per friendly item, learned from status messages: {volume: {min, max}, ...} */
 const ranges = {};

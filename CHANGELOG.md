@@ -16,6 +16,10 @@
   two VLANs: found in one 20 second browse, missed in the next), so a named address is the
   reliable way.
 
+- `-a auto` takes the soundbar's dns name when it has one that round-trips; `--discover-ip` pins
+  the address. `--install -a auto` persists what was found instead of scanning on every start.
+- `--config-schema` marks `address` with `x-discover: "network"` for she's Add-instance flow.
+
 ### Changed
 
 - Requires mqtt-interfaces-core ^0.9.0.

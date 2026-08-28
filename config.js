@@ -1,5 +1,6 @@
 import {parseConfig} from 'mqtt-interfaces-core';
 import pkg from './package.json' with {type: 'json'};
+import {discoveryHint} from './lib/discovery.js';
 
 export const OPTIONS = {
     address: {
@@ -7,6 +8,7 @@ export const OPTIONS = {
         type: 'string',
         describe: 'soundbar address (ip or hostname), or "auto" to find it on the network (see --discover)',
         demandOption: true,
+        discover: true,
     },
     port: {
         type: 'number',
@@ -29,7 +31,7 @@ export default parseConfig({
     pkg,
     options: OPTIONS,
     defaults: {name: 'soundbar'},
-    discovery: true,
+    discovery: discoveryHint(),
     examples: [
         ['$0 --discover', 'find soundbars on the network and exit'],
         ['$0 -a 192.168.1.50 -u mqtt://broker', 'run in the foreground'],
