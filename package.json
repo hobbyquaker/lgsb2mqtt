@@ -1,7 +1,7 @@
 {
   "name": "lgsb2mqtt",
-  "version": "2.0.1",
-  "description": "Interface between LG soundbars and MQTT, with Home Assistant discovery",
+  "version": "2.0.2",
+  "description": "Interface between LG soundbars and MQTT",
   "type": "module",
   "main": "index.js",
   "bin": {
@@ -47,7 +47,7 @@
     "spec": "2.0",
     "envPrefix": "LGSB2MQTT",
     "needs": [
-      "network-host"
+      "network"
     ],
     "serviceExtra": []
   },
