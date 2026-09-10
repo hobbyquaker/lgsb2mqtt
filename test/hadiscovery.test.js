@@ -46,7 +46,7 @@ describe('discoveryModel', () => {
         });
         assert.deepEqual(payload.o, {name: 'lgsb2mqtt', sw: '2.0.0', url: 'https://example.invalid'});
         assert.equal(payload.avty[0].t, 'soundbar/connected');
-        assert.match(payload.avty[0].avty_tpl, /2/);
+        assert.match(payload.avty[0].val_tpl, /2/);
     });
 
     test('components reflect known state', () => {
